@@ -442,7 +442,6 @@ export const SURVEY: Survey = {
           label: L("How do you prefer to learn?", "Bagaimanakah anda lebih suka belajar?"),
           required: true,
           options: [
-            { value: "physical", label: L("In person at a branch or event", "Bersemuka di cawangan atau acara") },
             { value: "online-live", label: L("Live online session", "Sesi dalam talian secara langsung") },
             { value: "self-paced", label: L("Short videos I can watch anytime", "Video pendek yang boleh ditonton bila-bila masa") },
             { value: "one-to-one", label: L("One-to-one coaching with my leader", "Bimbingan satu dengan satu bersama ketua saya") },

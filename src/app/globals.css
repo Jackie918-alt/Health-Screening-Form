@@ -41,6 +41,13 @@
   background-image: linear-gradient(100deg, #051c2c 0%, #072438 22%, #0a3142 42%, #00947c 74%, #00e5bb 100%);
 }
 
+/* Small controls only. The full brand gradient needs width to read; across a
+   44px button its dark navy end swamps everything, so scores use the teal end
+   of the palette on its own. */
+@utility bg-brand-teal {
+  background-image: linear-gradient(135deg, #1eeac9 0%, #00bd9c 100%);
+}
+
 @utility text-brand-gradient {
   background-image: linear-gradient(100deg, #0a3142 0%, #00947c 55%, #00e5bb 100%);
   background-clip: text;

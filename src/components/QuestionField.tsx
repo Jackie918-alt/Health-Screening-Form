@@ -105,7 +105,7 @@ function NumberScale({
               className={[
                 "focus-brand flex h-11 items-center justify-center rounded-xl border text-sm font-semibold transition-all sm:h-12",
                 selected
-                  ? "border-transparent bg-brand-gradient text-white shadow-md"
+                  ? "border-transparent bg-brand-teal text-deep-900 shadow-md"
                   : "border-line bg-white text-ink-soft hover:border-teal-400 hover:bg-teal-50",
               ].join(" ")}
             >
@@ -413,7 +413,7 @@ export function QuestionField({ question, value, otherText, error, onChange, onO
                           className={[
                             "focus-brand h-10 rounded-lg border text-sm font-semibold transition-all sm:w-11",
                             selected
-                              ? "border-transparent bg-brand-gradient text-white shadow-sm"
+                              ? "border-transparent bg-brand-teal text-deep-900 shadow-sm"
                               : "border-line bg-white text-ink-soft hover:border-teal-400 hover:bg-teal-50",
                           ].join(" ")}
                         >
