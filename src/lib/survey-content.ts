@@ -455,8 +455,8 @@ export const SURVEY: Survey = {
       id: "closing",
       title: L("Almost done", "Hampir selesai"),
       description: L(
-        "One question before you go.",
-        "Satu soalan sebelum anda pergi.",
+        "Few questions before you go.",
+        "Beberapa soalan sebelum anda pergi.",
       ),
       questions: [
         {

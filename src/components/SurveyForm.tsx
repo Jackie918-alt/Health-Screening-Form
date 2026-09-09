@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "re
 import { draftStore, parseDraft, readDraft, writeDraft } from "@/lib/draft-store";
 import { UI, interpolate } from "@/lib/i18n";
 import { SURVEY } from "@/lib/survey-content";
+import { surveyPeriodLabel } from "@/lib/survey-period";
 import type { AnswerValue } from "@/lib/survey-types";
 import {
   completionPercent,
@@ -149,6 +150,7 @@ export function SurveyForm() {
           </p>
 
           <div className="mt-7 flex flex-wrap gap-2.5">
+            <Chip icon="calendar">{tr(surveyPeriodLabel())}</Chip>
             <Chip icon="clock">{tr(UI.minutes)}</Chip>
             <Chip icon="list">
               {SURVEY.sections.length} {tr(UI.sections)}
@@ -391,8 +393,16 @@ export function SurveyForm() {
   );
 }
 
-function Chip({ children, icon }: { children: React.ReactNode; icon: "clock" | "list" | "lock" }) {
+function Chip({
+  children,
+  icon,
+}: {
+  children: React.ReactNode;
+  icon: "calendar" | "clock" | "list" | "lock";
+}) {
   const paths = {
+    calendar:
+      "M6 2a1 1 0 011 1v1h6V3a1 1 0 112 0v1h.5A2.5 2.5 0 0118 6.5v9a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 012 15.5v-9A2.5 2.5 0 014.5 4H5V3a1 1 0 011-1zM4 8v7.5c0 .3.2.5.5.5h11c.3 0 .5-.2.5-.5V8H4z",
     clock:
       "M10 2a8 8 0 100 16 8 8 0 000-16zm1 4a1 1 0 10-2 0v4c0 .3.1.5.3.7l2.5 2.5a1 1 0 001.4-1.4L11 9.6V6z",
     list: "M4 5h12a1 1 0 010 2H4a1 1 0 010-2zm0 4h12a1 1 0 010 2H4a1 1 0 110-2zm0 4h8a1 1 0 010 2H4a1 1 0 010-2z",
