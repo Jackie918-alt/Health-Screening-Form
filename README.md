@@ -131,12 +131,50 @@ renderer change (dynamic options), not just a schema edit.
 
 ## Where responses go
 
-`POST /api/submit` re-runs the same validation as the browser, then appends each response
-to `data/responses.jsonl` (git-ignored).
+`POST /api/submit` re-runs the same validation as the browser, then hands the response to
+the storage layer in `src/lib/responses/`. That layer picks its backend from the
+environment:
 
-**This is placeholder storage.** Local files do not persist on serverless hosts such as
-Vercel. Before launch, point the route at the real destination — SharePoint list, Google
-Sheet, or a database — and add a duplicate check on `agent_name`.
+| Environment | Backend |
+| --- | --- |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set | Supabase (`survey_responses` table) |
+| `ALLOW_FILE_STORE=1` | `data/responses.jsonl`, git-ignored — **development only** |
+| Neither | Submissions are refused, and `/admin` explains what is missing |
+
+Refusing submissions when there is nowhere to store them is deliberate: a survey that
+accepts answers it cannot keep is worse than one that is plainly switched off.
+
+Answers are stored as raw question ids (`{"region": "selangor"}`), never as labels, and
+resolved against the schema only for display. Rewording a question therefore never
+invalidates responses already collected.
+
+### First-time setup
+
+1. Create a Supabase project, open the SQL editor, and run [`supabase/schema.sql`](supabase/schema.sql).
+2. Copy `.env.example` to `.env.local` and fill in all four variables.
+3. Run `npm run supabase:check` — it verifies the credentials, the table, and a real
+   insert/read/delete round trip, then deletes its test row.
+4. Set the same four variables in Vercel → Settings → Environment Variables, and redeploy.
+
+## Admin portal
+
+`/admin` lists, searches, and exports responses. `/admin/login` takes a single shared
+password (`ADMIN_PASSWORD`) and exchanges it for an HMAC-signed, HTTP-only cookie that
+lasts eight hours.
+
+**The survey itself stays completely open** — no account, no credentials, nothing between
+an agent and the form. Only reading the results is gated.
+
+Two layers guard it: `src/proxy.ts` bounces anonymous traffic before a page renders, and
+`requireAdmin()` in `src/lib/admin-session.ts` re-checks next to every read, because the
+proxy alone can be bypassed by a request made directly to a route.
+
+The survey asks for name, NRIC and phone, so this data is PDPA-relevant. Personal details
+are kept off the list view and appear only on a response's own page.
+
+To move to Supabase Auth later, replace `verifyPassword` and `createSession` in
+`src/lib/admin-auth.ts`; every caller goes through `isAdmin()` / `requireAdmin()`, so
+nothing else changes.
 
 ## Notes
 

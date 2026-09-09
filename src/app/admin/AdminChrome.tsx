@@ -26,7 +26,7 @@ export function AdminHeader({ driver, note }: { driver: string; note: string }) 
             driver === "supabase" ? "bg-teal-50 text-teal-700" : "bg-amber-100 text-amber-800",
           ].join(" ")}
         >
-          {driver === "supabase" ? "Supabase" : "Local file"}
+          {driver === "supabase" ? "Supabase" : driver === "file" ? "Local file" : "Not connected"}
         </span>
 
         <form action={logout} className="ml-auto">

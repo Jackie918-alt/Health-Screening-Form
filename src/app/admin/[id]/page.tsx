@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
-import { getResponseStore } from "@/lib/responses";
+import { getStorageStatus } from "@/lib/responses";
 import { presentAnswers } from "@/lib/responses/present";
 import { AdminHeader } from "../AdminChrome";
 
@@ -22,7 +22,10 @@ export default async function ResponsePage({ params }: PageProps<"/admin/[id]">)
   await requireAdmin();
 
   const { id } = await params;
-  const store = getResponseStore();
+  const storage = getStorageStatus();
+  if (!storage.ok) notFound();
+
+  const store = storage.store;
   const response = await store.get(id);
   if (!response) notFound();
 

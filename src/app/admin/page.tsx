@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
-import { getResponseStore } from "@/lib/responses";
+import { getStorageStatus } from "@/lib/responses";
 import { firstComment } from "@/lib/responses/present";
 import { SURVEY } from "@/lib/survey-content";
 import { AdminHeader } from "./AdminChrome";
+import { StorageSetup } from "./StorageSetup";
 
 // Responses arrive continuously; a cached page would show stale counts.
 export const dynamic = "force-dynamic";
@@ -31,7 +32,19 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const search = typeof params.q === "string" ? params.q.trim() : "";
   const language = params.lang === "en" || params.lang === "ms" ? params.lang : undefined;
 
-  const store = getResponseStore();
+  // No storage configured is a setup problem, not an error page — say what is
+  // missing rather than throwing a 500 at whoever opens this.
+  const storage = getStorageStatus();
+  if (!storage.ok) {
+    return (
+      <div className="min-h-dvh bg-canvas">
+        <AdminHeader driver="none" note={storage.reason} />
+        <StorageSetup missing={storage.missing} />
+      </div>
+    );
+  }
+
+  const store = storage.store;
   const { rows, total } = await store.list({
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
