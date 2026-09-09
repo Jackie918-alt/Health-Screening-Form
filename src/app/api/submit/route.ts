@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Lang } from "@/lib/i18n";
 import { getResponseStore } from "@/lib/responses";
 import { SURVEY } from "@/lib/survey-content";
+import { isSurveyOpen } from "@/lib/survey-period";
 import { pruneHiddenAnswers, validateSection, visibleSections } from "@/lib/survey-logic";
 import type { Answers } from "@/lib/survey-types";
 
@@ -24,6 +25,12 @@ type Payload = {
 };
 
 export async function POST(request: Request) {
+  // The window is enforced here, not just hidden in the UI — a tab left open
+  // overnight must not be able to post after the survey closes.
+  if (!isSurveyOpen() && process.env.SURVEY_IGNORE_PERIOD !== "1") {
+    return NextResponse.json({ ok: false, error: "closed" }, { status: 403 });
+  }
+
   let payload: Payload;
   try {
     payload = (await request.json()) as Payload;

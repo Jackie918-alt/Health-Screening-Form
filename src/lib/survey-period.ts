@@ -68,3 +68,41 @@ export function surveyPeriodLabel(): Localized {
     ms: `Tempoh maklum balas: ${formatSurveyPeriod("ms")}`,
   };
 }
+
+/**
+ * Where "today" falls relative to the response window.
+ *
+ * The window is inclusive at both ends and evaluated in Malaysia time, because
+ * that is the calendar the dates were chosen against. Comparing UTC instants
+ * would close the survey at 8am on the 16th for an agent in Kuala Lumpur.
+ */
+export type PeriodPhase = "before" | "open" | "after";
+
+/** Today's date in Asia/Kuala_Lumpur, as plain numbers. */
+function todayInMalaysia(now: Date): PlainDate {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return { year: get("year"), month: get("month"), day: get("day") };
+}
+
+/** Comparable YYYYMMDD integer — avoids any Date parsing or timezone maths. */
+function ordinal(date: PlainDate): number {
+  return date.year * 10000 + date.month * 100 + date.day;
+}
+
+export function periodPhase(now: Date = new Date()): PeriodPhase {
+  const today = ordinal(todayInMalaysia(now));
+  if (today < ordinal(SURVEY_PERIOD.opens)) return "before";
+  if (today > ordinal(SURVEY_PERIOD.closes)) return "after";
+  return "open";
+}
+
+/** True on any day within the window, ends included. */
+export function isSurveyOpen(now: Date = new Date()): boolean {
+  return periodPhase(now) === "open";
+}

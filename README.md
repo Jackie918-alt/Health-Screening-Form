@@ -176,6 +176,36 @@ To move to Supabase Auth later, replace `verifyPassword` and `createSession` in
 `src/lib/admin-auth.ts`; every caller goes through `isAdmin()` / `requireAdmin()`, so
 nothing else changes.
 
+## Response window
+
+The survey is open only between the dates in [`src/lib/survey-period.ts`](src/lib/survey-period.ts)
+— currently 16 September to 15 October 2026, inclusive, in Malaysia time. Move the window by
+editing the two `opens` / `closes` lines; both languages and the enforcement follow.
+
+Outside the window the form shows "opens soon" or "has closed", and `POST /api/submit` returns
+403. The server check is the one that matters: a tab left open overnight must not be able to
+post after the survey closes.
+
+Two ways to see the live form outside the window: sign in to `/admin` first, or set
+`SURVEY_IGNORE_PERIOD=1`.
+
+## Tests
+
+`npm test` runs six suites with no framework and no dependencies — Node's own type stripping
+runs the TypeScript sources directly:
+
+| Suite | Covers |
+| --- | --- |
+| `admin-auth` | Session signing, forged and expired cookies, unconfigured deployments |
+| `throttle` | Login rate limiting |
+| `storage` | The Supabase driver against a mock of PostgREST |
+| `export` | Answer ids back to labels, and CSV quoting |
+| `summary` | Dashboard aggregates, including junk data |
+| `period` | Window boundaries, including the UTC+8 edges |
+
+`npm run test:live` runs the identical storage assertions against the real Supabase project
+in the environment, cleaning up every row it writes.
+
 ## Notes
 
 - Answers autosave to the device as the agent types, so a dropped connection or a locked

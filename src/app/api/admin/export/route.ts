@@ -1,5 +1,6 @@
 import { isAdmin } from "@/lib/admin-session";
 import { getResponseStore } from "@/lib/responses";
+import { filterResponses } from "@/lib/responses/filter";
 import { toCsv } from "@/lib/responses/csv";
 
 /**
@@ -15,16 +16,13 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const search = url.searchParams.get("q")?.trim().toLowerCase();
-  const language = url.searchParams.get("lang");
+  const lang = url.searchParams.get("lang");
 
-  let rows = await getResponseStore().all();
-  if (language === "en" || language === "ms") {
-    rows = rows.filter((row) => row.language === language);
-  }
-  if (search) {
-    rows = rows.filter((row) => JSON.stringify(row.answers).toLowerCase().includes(search));
-  }
+  // Same filter the dashboard uses, so the download always matches the screen.
+  const rows = filterResponses(await getResponseStore().all(), {
+    search: url.searchParams.get("q") ?? undefined,
+    language: lang === "en" || lang === "ms" ? lang : undefined,
+  });
 
   const stamp = new Date().toISOString().slice(0, 10);
   return new Response(toCsv(rows), {

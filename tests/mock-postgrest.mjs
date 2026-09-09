@@ -1,0 +1,83 @@
+import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
+
+/**
+ * A stand-in for Supabase's PostgREST, faithful to the parts the driver uses:
+ * service-role auth headers, `Prefer: return=representation` on insert,
+ * `Prefer: count=exact` -> Content-Range, and eq/ilike/order/limit/offset.
+ */
+export function startMock(rows = []) {
+  const requests = [];
+
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, "http://localhost");
+    requests.push({ method: req.method, path: url.pathname, query: url.searchParams, headers: req.headers });
+
+    // Reject anything not carrying the service-role key, exactly as Supabase would.
+    if (req.headers.apikey !== "test-service-key" || req.headers.authorization !== "Bearer test-service-key") {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ message: "No API key found in request" }));
+    }
+    if (url.pathname !== "/rest/v1/survey_responses") {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ message: `relation does not exist: ${url.pathname}` }));
+    }
+
+    if (req.method === "POST") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        const incoming = JSON.parse(body);
+        const row = { id: randomUUID(), received_at: new Date().toISOString(), ...incoming };
+        rows.push(row);
+        const wantsRow = String(req.headers.prefer ?? "").includes("return=representation");
+        res.writeHead(201, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(wantsRow ? [row] : []));
+      });
+      return;
+    }
+
+    if (req.method === "DELETE") {
+      const id = (url.searchParams.get("id") || "").replace("eq.", "");
+      const i = rows.findIndex((r) => r.id === id);
+      if (i >= 0) rows.splice(i, 1);
+      res.writeHead(204); return res.end();
+    }
+
+    // GET
+    let result = [...rows];
+    for (const [key, value] of url.searchParams) {
+      if (["select", "order", "limit", "offset"].includes(key)) continue;
+      if (value.startsWith("eq.")) {
+        const want = value.slice(3);
+        result = result.filter((r) => String(r[key]) === want);
+      } else if (value.startsWith("ilike.")) {
+        const needle = value.slice(6).replaceAll("*", "").toLowerCase();
+        const field = key.replace("::text", "");
+        result = result.filter((r) => JSON.stringify(r[field] ?? "").toLowerCase().includes(needle));
+      }
+    }
+
+    const order = url.searchParams.get("order");
+    if (order) {
+      const [field, dir] = order.split(".");
+      result.sort((a, b) => String(a[field]).localeCompare(String(b[field])) * (dir === "desc" ? -1 : 1));
+    }
+
+    const total = result.length;
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const limit = url.searchParams.get("limit");
+    const page = limit ? result.slice(offset, offset + Number(limit)) : result.slice(offset);
+
+    const headers = { "Content-Type": "application/json" };
+    if (String(req.headers.prefer ?? "").includes("count=exact")) {
+      headers["Content-Range"] = `${offset}-${offset + Math.max(page.length - 1, 0)}/${total}`;
+    }
+    res.writeHead(200, headers);
+    res.end(JSON.stringify(page));
+  });
+
+  return new Promise((resolve) => {
+    server.listen(0, () => resolve({ port: server.address().port, server, rows, requests }));
+  });
+}

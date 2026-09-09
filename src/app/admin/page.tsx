@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import { getStorageStatus } from "@/lib/responses";
+import { filterResponses } from "@/lib/responses/filter";
+import { summarise } from "@/lib/responses/summary";
 import { firstComment } from "@/lib/responses/present";
 import { SURVEY } from "@/lib/survey-content";
 import { AdminHeader } from "./AdminChrome";
 import { StorageSetup } from "./StorageSetup";
+import { SummaryPanel } from "./SummaryPanel";
 
 // Responses arrive continuously; a cached page would show stale counts.
 export const dynamic = "force-dynamic";
@@ -45,12 +48,22 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   }
 
   const store = storage.store;
-  const { rows, total } = await store.list({
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
-    search: search || undefined,
-    language,
-  });
+
+  // Two reads: the table pages in the database, while the summary needs every
+  // matching response. At survey scale — hundreds, not millions — the second
+  // read is cheap, and it keeps the headline figures honest about the same set
+  // the table is showing.
+  const [{ rows, total }, everything] = await Promise.all([
+    store.list({
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+      search: search || undefined,
+      language,
+    }),
+    store.all(),
+  ]);
+
+  const summary = summarise(filterResponses(everything, { search, language }));
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtered = Boolean(search || language);
@@ -85,6 +98,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
             Download CSV
           </a>
         </div>
+
+        <SummaryPanel summary={summary} />
 
         <form method="get" className="mt-6 flex flex-wrap gap-3">
           <input

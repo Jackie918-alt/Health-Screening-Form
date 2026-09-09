@@ -5,13 +5,14 @@ import { UI } from "@/lib/i18n";
 import { LanguageProvider, useLanguage } from "./LanguageProvider";
 import { LanguageToggle } from "./LanguageToggle";
 import { SurveyForm } from "./SurveyForm";
+import type { PeriodPhase } from "@/lib/survey-period";
 
-export function SurveyShell({ year }: { year: number }) {
+export function SurveyShell({ year, phase }: { year: number; phase: PeriodPhase }) {
   return (
     <LanguageProvider>
       <BrandHeader />
       <main className="flex-1">
-        <SurveyForm />
+        <SurveyForm windowPhase={phase} />
       </main>
       <BrandFooter year={year} />
     </LanguageProvider>

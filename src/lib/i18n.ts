@@ -118,6 +118,22 @@ export const UI = {
   ),
   retry: L("Try again", "Cuba lagi"),
 
+  // Response window
+  notOpenTitle: L("This survey opens soon", "Kaji selidik ini dibuka tidak lama lagi"),
+  notOpenBody: L(
+    "The response period runs from {period}. Please come back on the opening date — your answers will not be recorded before then.",
+    "Tempoh maklum balas ialah {period}. Sila kembali pada tarikh pembukaan — jawapan anda tidak akan direkodkan sebelum itu.",
+  ),
+  closedTitle: L("This survey has closed", "Kaji selidik ini telah ditutup"),
+  closedBody: L(
+    "The response period ran from {period} and is now over. Thank you to everyone who took part — the People & Agency Development team is going through what you told us.",
+    "Tempoh maklum balas ialah {period} dan kini telah berakhir. Terima kasih kepada semua yang mengambil bahagian — pasukan People & Agency Development sedang meneliti maklum balas anda.",
+  ),
+  submitClosed: L(
+    "The survey closed before this could be submitted, so your answers were not recorded.",
+    "Kaji selidik telah ditutup sebelum ini dapat dihantar, jadi jawapan anda tidak direkodkan.",
+  ),
+
   footerRights: L("We Kongsi. All rights reserved.", "We Kongsi. Hak cipta terpelihara."),
 } as const;
 

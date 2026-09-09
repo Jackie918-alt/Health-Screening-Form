@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "re
 import { draftStore, parseDraft, readDraft, writeDraft } from "@/lib/draft-store";
 import { UI, interpolate } from "@/lib/i18n";
 import { SURVEY } from "@/lib/survey-content";
-import { surveyPeriodLabel } from "@/lib/survey-period";
+import { formatSurveyPeriod, surveyPeriodLabel, type PeriodPhase } from "@/lib/survey-period";
 import type { AnswerValue } from "@/lib/survey-types";
 import {
   completionPercent,
@@ -19,9 +19,9 @@ import { useLanguage } from "./LanguageProvider";
 import { QuestionField } from "./QuestionField";
 
 type Phase = "intro" | "form" | "done";
-type Status = "idle" | "submitting" | "error";
+type Status = "idle" | "submitting" | "error" | "closed";
 
-export function SurveyForm() {
+export function SurveyForm({ windowPhase = "open" }: { windowPhase?: PeriodPhase }) {
   const { lang, tr } = useLanguage();
   const [phase, setPhase] = useState<Phase>("intro");
   const [errors, setErrors] = useState<Errors>({});
@@ -112,6 +112,12 @@ export function SurveyForm() {
           answers: pruneHiddenAnswers(SURVEY, answers),
         }),
       });
+      // 403 means the window closed while this tab was open — a different
+      // problem from a dropped connection, and retrying will not help.
+      if (res.status === 403) {
+        setStatus("closed");
+        return;
+      }
       if (!res.ok) throw new Error(`Submit failed: ${res.status}`);
       draftStore.clear();
       setPhase("done");
@@ -132,6 +138,30 @@ export function SurveyForm() {
   function resetAll() {
     if (!window.confirm(tr(UI.clearDraftConfirm))) return;
     startOver();
+  }
+
+  // ── Outside the response window ──────────────────────────────────────────
+  // Shown in place of everything else: there is no point letting an agent fill
+  // in six sections that the server will refuse.
+  if (windowPhase !== "open") {
+    const closed = windowPhase === "after";
+    return (
+      <div ref={topRef} className="mx-auto w-full max-w-2xl px-4 py-10 sm:py-16">
+        <div className="rounded-3xl border border-line bg-white p-7 text-center shadow-card sm:p-11">
+          <p className="font-display text-[13px] font-bold uppercase tracking-[0.14em] text-brand-gradient">
+            {tr(UI.brandTagline)}
+          </p>
+          <h1 className="mt-3 font-display text-[26px] font-extrabold leading-[1.35] tracking-tight text-ink sm:text-[30px]">
+            {tr(closed ? UI.closedTitle : UI.notOpenTitle)}
+          </h1>
+          <p className="mx-auto mt-5 max-w-lg text-[15px] leading-[1.75] text-ink-soft">
+            {interpolate(closed ? UI.closedBody : UI.notOpenBody, lang, {
+              period: formatSurveyPeriod(lang),
+            })}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   // ── Intro ────────────────────────────────────────────────────────────────
@@ -310,6 +340,12 @@ export function SurveyForm() {
           >
             {interpolate(UI.errorSummary, lang, { count: errorCount })}
           </p>
+        )}
+
+        {status === "closed" && (
+          <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-medium">{tr(UI.submitClosed)}</p>
+          </div>
         )}
 
         {status === "error" && (
