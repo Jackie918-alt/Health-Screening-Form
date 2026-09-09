@@ -460,6 +460,23 @@ export const SURVEY: Survey = {
       ),
       questions: [
         {
+          id: "anything_else",
+          type: "long-text",
+          label: L(
+            "Is there anything else you'd like to share with us?",
+            "Ada apa-apa lagi yang anda ingin kongsikan dengan kami?",
+          ),
+          help: L(
+            "Feel free to share any feedback, suggestions, concerns, or anything else on your mind.",
+            "Kongsikan sebarang maklum balas, cadangan, kebimbangan, atau apa sahaja yang terlintas di fikiran anda.",
+          ),
+          placeholder: L(
+            "Anything at all — we read every comment…",
+            "Apa sahaja — kami membaca setiap komen…",
+          ),
+          maxLength: 1000,
+        },
+        {
           id: "followup_ok",
           type: "radio",
           label: L(
