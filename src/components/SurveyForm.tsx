@@ -284,7 +284,7 @@ export function SurveyForm() {
           )}
         </header>
 
-        <div className="grid grid-cols-1 gap-8 pt-7 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-9">
+        <div className="grid grid-cols-1 gap-6 pt-7 sm:grid-cols-2 sm:gap-x-5 sm:gap-y-7">
           {questions.map((q) => (
             <div key={q.id} className={q.width === "half" ? "min-w-0" : "min-w-0 sm:col-span-2"}>
               <QuestionField
