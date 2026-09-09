@@ -1,18 +1,19 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { NextResponse } from "next/server";
+import type { Lang } from "@/lib/i18n";
+import { getResponseStore } from "@/lib/responses";
 import { SURVEY } from "@/lib/survey-content";
 import { pruneHiddenAnswers, validateSection, visibleSections } from "@/lib/survey-logic";
 import type { Answers } from "@/lib/survey-types";
 
 /**
- * First-draft persistence: append each response to a JSON Lines file on disk.
+ * Public endpoint — deliberately unauthenticated. Agents fill the survey with
+ * no account and no credentials; only reading the results (under `/admin`) is
+ * gated.
  *
- * TODO before launch — swap this for the real destination (SharePoint list,
- * Google Sheet, Supabase, or whichever backend the team settles on). Local
- * files do not persist on serverless hosts such as Vercel.
+ * Where the response lands is the storage layer's business: Supabase when its
+ * environment variables are set, a local file otherwise. See
+ * `src/lib/responses/index.ts`.
  */
-const STORE = path.join(process.cwd(), "data", "responses.jsonl");
 
 type Payload = {
   surveyId?: string;
@@ -42,17 +43,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "validation", fields: problems }, { status: 422 });
   }
 
-  const record = {
-    surveyId: payload.surveyId ?? SURVEY.id,
-    version: payload.version ?? SURVEY.version,
-    language: payload.language ?? "en",
-    submittedAt: payload.submittedAt ?? new Date().toISOString(),
-    receivedAt: new Date().toISOString(),
-    answers,
-  };
-
-  await fs.mkdir(path.dirname(STORE), { recursive: true });
-  await fs.appendFile(STORE, `${JSON.stringify(record)}\n`, "utf8");
+  try {
+    await getResponseStore().save({
+      surveyId: payload.surveyId ?? SURVEY.id,
+      version: payload.version ?? SURVEY.version,
+      language: (payload.language === "ms" ? "ms" : "en") as Lang,
+      submittedAt: payload.submittedAt ?? new Date().toISOString(),
+      receivedAt: new Date().toISOString(),
+      answers,
+    });
+  } catch (error) {
+    // Never swallow this: a thank-you screen over a failed write is how a
+    // survey silently collects nothing.
+    console.error("Failed to store survey response:", error);
+    return NextResponse.json({ ok: false, error: "storage" }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }
