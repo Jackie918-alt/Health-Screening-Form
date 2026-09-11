@@ -25,6 +25,22 @@ create index if not exists survey_responses_received_at_idx
 create index if not exists survey_responses_language_idx
   on public.survey_responses (language);
 
+-- One response per NRIC.
+--
+-- The app stores NRICs digits-only (030405-10-1234 and 030405101234 are the
+-- same person, and the form accepts both spellings), so this is a plain unique
+-- index over the stored value.
+--
+-- The app checks for an existing NRIC before inserting, to give a clear
+-- message. This index is what actually prevents a double submission, because
+-- only the database can stop two requests racing — a double-click, or the same
+-- agent on two devices.
+--
+-- Partial, so responses with no NRIC do not collide with each other on null.
+create unique index if not exists survey_responses_nric_unique
+  on public.survey_responses ((answers->>'nric'))
+  where answers->>'nric' is not null;
+
 -- Row Level Security ON with no policies: the anon and authenticated keys can
 -- do nothing at all. The app reaches this table only through the service-role
 -- key, which is server-side and bypasses RLS. That is what keeps responses

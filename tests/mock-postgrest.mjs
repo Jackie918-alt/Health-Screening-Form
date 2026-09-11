@@ -28,6 +28,18 @@ export function startMock(rows = []) {
       req.on("data", (c) => (body += c));
       req.on("end", () => {
         const incoming = JSON.parse(body);
+
+        // Mirror the unique index on (answers->>'nric'): Postgres answers 409
+        // with SQLSTATE 23505, and the driver depends on recognising that.
+        const nric = incoming.answers?.nric;
+        if (nric && rows.some((r) => r.answers?.nric === nric)) {
+          res.writeHead(409, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({
+            code: "23505",
+            message: `duplicate key value violates unique constraint "survey_responses_nric_unique"`,
+          }));
+        }
+
         const row = { id: randomUUID(), received_at: new Date().toISOString(), ...incoming };
         rows.push(row);
         const wantsRow = String(req.headers.prefer ?? "").includes("return=representation");
@@ -50,7 +62,11 @@ export function startMock(rows = []) {
       if (["select", "order", "limit", "offset"].includes(key)) continue;
       if (value.startsWith("eq.")) {
         const want = value.slice(3);
-        result = result.filter((r) => String(r[key]) === want);
+        // `answers->>nric` reads a key out of the jsonb column, as PostgREST does.
+        const json = key.match(/^(\w+)->>(\w+)$/);
+        result = json
+          ? result.filter((r) => String(r[json[1]]?.[json[2]] ?? "") === want)
+          : result.filter((r) => String(r[key]) === want);
       } else if (value.startsWith("ilike.")) {
         // Real PostgREST cannot cast jsonb to text in a filter; it answers
         // 42883. Rejecting it here too stops the mock from blessing a query

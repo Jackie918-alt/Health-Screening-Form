@@ -11,6 +11,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Lang } from "../i18n";
+import { DuplicateResponseError, normaliseNric } from "./nric";
 import type { ListOptions, NewResponse, ResponseStore, SurveyResponse } from "./types";
 
 const FILE = path.join(process.cwd(), "data", "responses.jsonl");
@@ -60,6 +61,9 @@ export function createFileStore(): ResponseStore {
     note: "Responses are stored in a local file. Not durable on Vercel — connect Supabase before launch.",
 
     async save(record: NewResponse) {
+      const nric = normaliseNric(record.answers.nric);
+      if (nric && (await this.findByNric(nric))) throw new DuplicateResponseError();
+
       const saved: SurveyResponse = { id: randomUUID(), ...record };
       await fs.mkdir(path.dirname(FILE), { recursive: true });
       await fs.appendFile(FILE, `${JSON.stringify(saved)}\n`, "utf8");
@@ -80,6 +84,13 @@ export function createFileStore(): ResponseStore {
     async get(id: string) {
       const all = await readAll();
       return all.find((row) => row.id === id) ?? null;
+    },
+
+    async findByNric(nric: string) {
+      const digits = normaliseNric(nric);
+      if (!digits) return null;
+      const all = await readAll();
+      return all.find((row) => normaliseNric(row.answers.nric) === digits)?.id ?? null;
     },
 
     async all() {

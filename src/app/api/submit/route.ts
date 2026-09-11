@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Lang } from "@/lib/i18n";
 import { getResponseStore } from "@/lib/responses";
+import { DuplicateResponseError, normaliseNric } from "@/lib/responses/nric";
 import { SURVEY } from "@/lib/survey-content";
 import { isSurveyOpen } from "@/lib/survey-period";
 import { pruneHiddenAnswers, validateSection, visibleSections } from "@/lib/survey-logic";
@@ -50,6 +51,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "validation", fields: problems }, { status: 422 });
   }
 
+  // Store the NRIC in one canonical shape. The form accepts 030405-10-1234 and
+  // 030405101234 as the same person, so storing them differently would let the
+  // same agent answer twice.
+  const nric = normaliseNric(answers.nric);
+  const stored = nric ? { ...answers, nric } : answers;
+
   try {
     await getResponseStore().save({
       surveyId: payload.surveyId ?? SURVEY.id,
@@ -57,10 +64,15 @@ export async function POST(request: Request) {
       language: (payload.language === "ms" ? "ms" : "en") as Lang,
       submittedAt: payload.submittedAt ?? new Date().toISOString(),
       receivedAt: new Date().toISOString(),
-      answers,
+      answers: stored,
     });
   } catch (error) {
-    // Never swallow this: a thank-you screen over a failed write is how a
+    // One response per NRIC. Answered as 409 rather than a generic failure so
+    // the form can say what actually happened.
+    if (error instanceof DuplicateResponseError) {
+      return NextResponse.json({ ok: false, error: "duplicate" }, { status: 409 });
+    }
+    // Never swallow the rest: a thank-you screen over a failed write is how a
     // survey silently collects nothing.
     console.error("Failed to store survey response:", error);
     return NextResponse.json({ ok: false, error: "storage" }, { status: 500 });

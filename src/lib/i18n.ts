@@ -129,6 +129,10 @@ export const UI = {
     "The response period ran from {period} and is now over. Thank you to everyone who took part — the People & Agency Development team is going through what you told us.",
     "Tempoh maklum balas ialah {period} dan kini telah berakhir. Terima kasih kepada semua yang mengambil bahagian — pasukan People & Agency Development sedang meneliti maklum balas anda.",
   ),
+  submitDuplicate: L(
+    "A response has already been recorded for this NRIC. Each agent may answer once. If you think this is a mistake, please contact the People & Agency Development team.",
+    "Satu jawapan telah pun direkodkan untuk NRIC ini. Setiap ejen hanya boleh menjawab sekali. Jika anda rasa ini satu kesilapan, sila hubungi pasukan People & Agency Development.",
+  ),
   submitClosed: L(
     "The survey closed before this could be submitted, so your answers were not recorded.",
     "Kaji selidik telah ditutup sebelum ini dapat dihantar, jadi jawapan anda tidak direkodkan.",

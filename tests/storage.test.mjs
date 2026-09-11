@@ -91,6 +91,29 @@ try {
   const all = await store.all();
   check("all returns every row, oldest first", mine(all).map((r) => r.id), [first.id, second.id]);
 
+  // ── One response per NRIC ─────────────────────────────────────────────────
+  const { DuplicateResponseError } = await import(path.join(root, "src/lib/responses/nric.ts"));
+  const nric = String(Date.now()).padStart(12, "9").slice(-12);
+
+  const original = await seed("en", { agent_name: "First", nric }, "2026-09-23T02:00:00.000Z");
+  check("the first response for an NRIC is accepted", typeof original.id, "string");
+  check("findByNric locates it", await store.findByNric(nric), original.id);
+
+  try {
+    await seed("en", { agent_name: "Second", nric }, "2026-09-24T02:00:00.000Z");
+    check("a second response for the same NRIC is refused", false);
+  } catch (error) {
+    check("a second response for the same NRIC is refused",
+      error instanceof DuplicateResponseError);
+  }
+
+  const other = String(Number(nric) - 1).padStart(12, "0").slice(-12);
+  check("a different NRIC is not treated as a duplicate", await store.findByNric(other), null);
+  check("findByNric ignores a malformed NRIC", await store.findByNric("123"), null);
+
+  const stillOne = await store.list({ limit: 50, offset: 0, search: nric });
+  check("only one row exists for that NRIC", mine(stillOne.rows).length, 1);
+
   const badKey = createSupabaseStore(url, "definitely-not-the-key");
   try {
     await badKey.list({ limit: 1, offset: 0 });

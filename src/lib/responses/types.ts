@@ -44,7 +44,10 @@ export interface ResponseStore {
   readonly driver: "supabase" | "file";
   /** Human-readable note about the driver's durability, shown to admins. */
   readonly note: string;
+  /** Throws `DuplicateResponseError` when this NRIC has already answered. */
   save(record: NewResponse): Promise<SurveyResponse>;
+  /** Id of the existing response for this NRIC, or null. Digits-only match. */
+  findByNric(nric: string): Promise<string | null>;
   list(options: ListOptions): Promise<ListResult>;
   get(id: string): Promise<SurveyResponse | null>;
   /** Every row, oldest first — used only by the CSV export. */

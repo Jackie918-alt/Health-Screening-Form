@@ -19,7 +19,7 @@ import { useLanguage } from "./LanguageProvider";
 import { QuestionField } from "./QuestionField";
 
 type Phase = "intro" | "form" | "done";
-type Status = "idle" | "submitting" | "error" | "closed";
+type Status = "idle" | "submitting" | "error" | "closed" | "duplicate";
 
 export function SurveyForm({ windowPhase = "open" }: { windowPhase?: PeriodPhase }) {
   const { lang, tr } = useLanguage();
@@ -116,6 +116,12 @@ export function SurveyForm({ windowPhase = "open" }: { windowPhase?: PeriodPhase
       // problem from a dropped connection, and retrying will not help.
       if (res.status === 403) {
         setStatus("closed");
+        return;
+      }
+      // This NRIC has already answered. Retrying will not change that, so no
+      // retry link is offered.
+      if (res.status === 409) {
+        setStatus("duplicate");
         return;
       }
       if (!res.ok) throw new Error(`Submit failed: ${res.status}`);
@@ -340,6 +346,12 @@ export function SurveyForm({ windowPhase = "open" }: { windowPhase?: PeriodPhase
           >
             {interpolate(UI.errorSummary, lang, { count: errorCount })}
           </p>
+        )}
+
+        {status === "duplicate" && (
+          <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+            <p className="font-medium">{tr(UI.submitDuplicate)}</p>
+          </div>
         )}
 
         {status === "closed" && (

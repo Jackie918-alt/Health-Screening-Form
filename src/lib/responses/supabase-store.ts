@@ -17,6 +17,7 @@ if (typeof window !== "undefined") {
 
 import type { Lang } from "../i18n";
 import type { Answers } from "../survey-types";
+import { DuplicateResponseError, normaliseNric } from "./nric";
 import type { ListOptions, NewResponse, ResponseStore, SurveyResponse } from "./types";
 
 const TABLE = "survey_responses";
@@ -89,20 +90,53 @@ export function createSupabaseStore(url: string, serviceKey: string): ResponseSt
     note: "Responses are stored in Supabase.",
 
     async save(record: NewResponse) {
-      const res = await call("", {
-        method: "POST",
-        headers: { Prefer: "return=representation" },
-        body: JSON.stringify({
-          survey_id: record.surveyId,
-          version: record.version,
-          language: record.language,
-          submitted_at: record.submittedAt,
-          received_at: record.receivedAt,
-          answers: record.answers,
-        }),
-      });
+      const nric = normaliseNric(record.answers.nric);
+
+      // Checked here for a clear message, and again by a unique index in the
+      // database for the cases this check cannot see: a double-click, or two
+      // devices submitting the same NRIC at the same moment. The index is the
+      // guarantee; this is only the good error message.
+      if (nric && (await this.findByNric(nric))) throw new DuplicateResponseError();
+
+      let res: Response;
+      try {
+        res = await call("", {
+          method: "POST",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify({
+            survey_id: record.surveyId,
+            version: record.version,
+            language: record.language,
+            submitted_at: record.submittedAt,
+            received_at: record.receivedAt,
+            answers: record.answers,
+          }),
+        });
+      } catch (error) {
+        // 23505 is Postgres' unique violation — the index caught a duplicate
+        // that slipped past the check above.
+        if (error instanceof Error && error.message.includes("23505")) {
+          throw new DuplicateResponseError();
+        }
+        throw error;
+      }
+
       const [row] = (await res.json()) as Row[];
       return toResponse(row);
+    },
+
+    /** True when this NRIC has already answered. Digits-only comparison. */
+    async findByNric(nric: string) {
+      const digits = normaliseNric(nric);
+      if (!digits) return null;
+
+      // Stored NRICs are already digits-only, so this is a plain equality
+      // match on the JSON key — which PostgREST supports natively and an
+      // expression index can serve.
+      const params = new URLSearchParams({ select: "id", "answers->>nric": `eq.${digits}`, limit: "1" });
+      const res = await call(`?${params}`);
+      const rows = (await res.json()) as { id: string }[];
+      return rows[0]?.id ?? null;
     },
 
     async list({ limit, offset, search, language }: ListOptions) {
