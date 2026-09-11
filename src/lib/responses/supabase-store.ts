@@ -43,8 +43,19 @@ function toResponse(row: Row): SurveyResponse {
   };
 }
 
+/**
+ * Accepts either form of the URL Supabase shows you: the project base
+ * (`https://x.supabase.co`) or the API endpoint it displays more prominently
+ * (`https://x.supabase.co/rest/v1/`). Pasting the latter is the obvious
+ * mistake to make, and it would otherwise fail as a 404 that looks like a
+ * missing table.
+ */
+export function normaliseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
+}
+
 export function createSupabaseStore(url: string, serviceKey: string): ResponseStore {
-  const endpoint = `${url.replace(/\/+$/, "")}/rest/v1/${TABLE}`;
+  const endpoint = `${normaliseUrl(url)}/rest/v1/${TABLE}`;
   const headers = {
     apikey: serviceKey,
     Authorization: `Bearer ${serviceKey}`,
@@ -95,17 +106,33 @@ export function createSupabaseStore(url: string, serviceKey: string): ResponseSt
     },
 
     async list({ limit, offset, search, language }: ListOptions) {
-      const params = new URLSearchParams({
-        select: "*",
-        order: "received_at.desc",
-        limit: String(limit),
-        offset: String(offset),
-      });
-      if (language) params.set("language", `eq.${language}`);
-      // Match anywhere in the serialised answers — good enough for an admin
-      // lookup, and it keeps the filter in the database rather than pulling
-      // every row across the wire to grep it here.
-      if (search) params.set("answers::text", `ilike.*${search}*`);
+      const base = new URLSearchParams({ select: "*", order: "received_at.desc" });
+      if (language) base.set("language", `eq.${language}`);
+
+      // Text search runs here rather than in the database. PostgREST cannot
+      // cast jsonb to text inside a filter — `answers::text=ilike.*x*` fails
+      // with "operator does not exist: jsonb ~~* unknown" — and the
+      // alternative, a generated text column, is a migration this table does
+      // not need at survey scale. So a search pulls the matching language's
+      // rows and filters them in memory, which also keeps the total honest.
+      //
+      // If this table ever grows past a few thousand rows, add
+      //   alter table survey_responses add column answers_text text
+      //     generated always as (answers::text) stored;
+      // and filter on that column instead.
+      if (search) {
+        const res = await call(`?${base}`);
+        const all = ((await res.json()) as Row[]).map(toResponse);
+        const needle = search.toLowerCase();
+        const matched = all.filter((row) =>
+          JSON.stringify(row.answers).toLowerCase().includes(needle),
+        );
+        return { rows: matched.slice(offset, offset + limit), total: matched.length };
+      }
+
+      const params = new URLSearchParams(base);
+      params.set("limit", String(limit));
+      params.set("offset", String(offset));
 
       const res = await call(`?${params}`, { headers: { Prefer: "count=exact" } });
       const rows = (await res.json()) as Row[];

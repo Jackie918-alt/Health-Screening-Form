@@ -44,7 +44,8 @@ if (KEY.length < 40) {
   bad("Service role key looks too short — did you paste the anon key by mistake?");
 }
 
-const endpoint = `${URL_.replace(/\/+$/, "")}/rest/v1/${TABLE}`;
+const base = URL_.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
+const endpoint = `${base}/rest/v1/${TABLE}`;
 const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
 
 // 1. Can we reach the table at all?

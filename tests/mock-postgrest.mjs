@@ -52,9 +52,18 @@ export function startMock(rows = []) {
         const want = value.slice(3);
         result = result.filter((r) => String(r[key]) === want);
       } else if (value.startsWith("ilike.")) {
+        // Real PostgREST cannot cast jsonb to text in a filter; it answers
+        // 42883. Rejecting it here too stops the mock from blessing a query
+        // the database would refuse.
+        if (key.includes("::")) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({
+            code: "42883",
+            message: "operator does not exist: jsonb ~~* unknown",
+          }));
+        }
         const needle = value.slice(6).replaceAll("*", "").toLowerCase();
-        const field = key.replace("::text", "");
-        result = result.filter((r) => JSON.stringify(r[field] ?? "").toLowerCase().includes(needle));
+        result = result.filter((r) => JSON.stringify(r[key] ?? "").toLowerCase().includes(needle));
       }
     }
 
