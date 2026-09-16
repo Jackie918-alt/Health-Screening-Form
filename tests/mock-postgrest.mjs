@@ -32,7 +32,7 @@ export function startMock(rows = []) {
         // Mirror the unique index on (answers->>'nric'): Postgres answers 409
         // with SQLSTATE 23505, and the driver depends on recognising that.
         const nric = incoming.answers?.nric;
-        if (nric && rows.some((r) => r.answers?.nric === nric)) {
+        if (nric && rows.some((r) => r.answers?.nric === nric && r.deleted_at == null)) {
           res.writeHead(409, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({
             code: "23505",
@@ -49,6 +49,19 @@ export function startMock(rows = []) {
       return;
     }
 
+    if (req.method === "PATCH") {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        const patch = JSON.parse(body);
+        const id = (url.searchParams.get("id") || "").replace("eq.", "");
+        for (const row of rows) if (row.id === id) Object.assign(row, patch);
+        res.writeHead(204);
+        res.end();
+      });
+      return;
+    }
+
     if (req.method === "DELETE") {
       const id = (url.searchParams.get("id") || "").replace("eq.", "");
       const i = rows.findIndex((r) => r.id === id);
@@ -60,7 +73,10 @@ export function startMock(rows = []) {
     let result = [...rows];
     for (const [key, value] of url.searchParams) {
       if (["select", "order", "limit", "offset"].includes(key)) continue;
-      if (value.startsWith("eq.")) {
+      if (value === "is.null" || value === "not.is.null") {
+        const wantNull = value === "is.null";
+        result = result.filter((r) => (r[key] == null) === wantNull);
+      } else if (value.startsWith("eq.")) {
         const want = value.slice(3);
         // `answers->>nric` reads a key out of the jsonb column, as PostgREST does.
         const json = key.match(/^(\w+)->>(\w+)$/);

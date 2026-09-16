@@ -99,6 +99,15 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           </a>
         </div>
 
+        {params.deleted === "1" && (
+          <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            Response moved to the bin.{" "}
+            <Link href="/admin/bin" className="font-bold underline underline-offset-4">
+              View bin
+            </Link>
+          </p>
+        )}
+
         <SummaryPanel summary={summary} />
 
         <form method="get" className="mt-6 flex flex-wrap gap-3">

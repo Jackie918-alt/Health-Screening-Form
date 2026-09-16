@@ -25,6 +25,17 @@ create index if not exists survey_responses_received_at_idx
 create index if not exists survey_responses_language_idx
   on public.survey_responses (language);
 
+-- The bin.
+--
+-- Deleting from the admin UI sets this rather than removing the row. An
+-- agent's answers are a record of something they told us, and "I deleted the
+-- wrong one" has no remedy once the row is gone.
+alter table public.survey_responses
+  add column if not exists deleted_at timestamptz;
+
+create index if not exists survey_responses_deleted_at_idx
+  on public.survey_responses (deleted_at);
+
 -- One response per NRIC.
 --
 -- The app stores NRICs digits-only (030405-10-1234 and 030405101234 are the
@@ -36,10 +47,13 @@ create index if not exists survey_responses_language_idx
 -- only the database can stop two requests racing — a double-click, or the same
 -- agent on two devices.
 --
--- Partial, so responses with no NRIC do not collide with each other on null.
+-- Partial twice over: responses with no NRIC do not collide with each other on
+-- null, and a binned response releases its NRIC — if an admin deleted someone's
+-- response, that agent must be able to answer again.
+drop index if exists public.survey_responses_nric_unique;
 create unique index if not exists survey_responses_nric_unique
   on public.survey_responses ((answers->>'nric'))
-  where answers->>'nric' is not null;
+  where answers->>'nric' is not null and deleted_at is null;
 
 -- Row Level Security ON with no policies: the anon and authenticated keys can
 -- do nothing at all. The app reaches this table only through the service-role

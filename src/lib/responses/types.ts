@@ -21,13 +21,23 @@ export type SurveyResponse = {
   /** Server clock. Authoritative — this is what we sort and filter on. */
   receivedAt: string;
   answers: Answers;
+  /**
+   * When an admin moved this to the bin, or null while it is live.
+   *
+   * Responses are never destroyed by the admin UI. An agent's answers are a
+   * record of something they told us, and "I deleted the wrong one" has no
+   * remedy if the row is gone.
+   */
+  deletedAt: string | null;
 };
 
-export type NewResponse = Omit<SurveyResponse, "id">;
+export type NewResponse = Omit<SurveyResponse, "id" | "deletedAt">;
 
 export type ListOptions = {
   limit: number;
   offset: number;
+  /** List the bin instead of the live responses. Default false. */
+  deleted?: boolean;
   /** Case-insensitive match across every free-text answer. */
   search?: string;
   language?: Lang;
@@ -50,6 +60,10 @@ export interface ResponseStore {
   findByNric(nric: string): Promise<string | null>;
   list(options: ListOptions): Promise<ListResult>;
   get(id: string): Promise<SurveyResponse | null>;
-  /** Every row, oldest first — used only by the CSV export. */
+  /** Every live row, oldest first. Excludes the bin. */
   all(): Promise<SurveyResponse[]>;
+  /** Moves a response to the bin. Reversible; nothing is destroyed. */
+  softDelete(id: string): Promise<void>;
+  /** Brings a response back out of the bin. */
+  restore(id: string): Promise<void>;
 }

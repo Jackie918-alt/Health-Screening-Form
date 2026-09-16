@@ -29,7 +29,14 @@ export function AdminHeader({ driver, note }: { driver: string; note: string }) 
           {driver === "supabase" ? "Supabase" : driver === "file" ? "Local file" : "Not connected"}
         </span>
 
-        <form action={logout} className="ml-auto">
+        <Link
+          href="/admin/bin"
+          className="focus-brand ml-auto rounded-full px-3 py-2 font-display text-sm font-bold text-ink-soft underline-offset-4 hover:text-deep-700 hover:underline"
+        >
+          Bin
+        </Link>
+
+        <form action={logout}>
           <button
             type="submit"
             className="focus-brand rounded-full border border-line px-4 py-2 font-display text-sm font-bold text-ink-soft transition-colors hover:border-teal-400 hover:bg-teal-50"

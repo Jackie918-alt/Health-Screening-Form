@@ -41,6 +41,7 @@ async function readAll(): Promise<SurveyResponse[]> {
             submittedAt: parsed.submittedAt ?? "",
             receivedAt: parsed.receivedAt ?? parsed.submittedAt ?? "",
             answers: parsed.answers ?? {},
+            deletedAt: parsed.deletedAt ?? null,
           } satisfies SurveyResponse,
         ];
       } catch {
@@ -49,10 +50,18 @@ async function readAll(): Promise<SurveyResponse[]> {
     });
 }
 
-function matches(row: SurveyResponse, { search, language }: ListOptions): boolean {
+function matches(row: SurveyResponse, { search, language, deleted }: ListOptions): boolean {
+  if (Boolean(row.deletedAt) !== Boolean(deleted)) return false;
   if (language && row.language !== language) return false;
   if (!search) return true;
   return JSON.stringify(row.answers).toLowerCase().includes(search.toLowerCase());
+}
+
+/** Rewrites every line through `change`. Only the dev store needs this. */
+async function rewrite(change: (row: SurveyResponse) => SurveyResponse): Promise<void> {
+  const rows = (await readAll()).map(change);
+  await fs.mkdir(path.dirname(FILE), { recursive: true });
+  await fs.writeFile(FILE, rows.map((r) => `${JSON.stringify(r)}\n`).join(""), "utf8");
 }
 
 export function createFileStore(): ResponseStore {
@@ -64,7 +73,7 @@ export function createFileStore(): ResponseStore {
       const nric = normaliseNric(record.answers.nric);
       if (nric && (await this.findByNric(nric))) throw new DuplicateResponseError();
 
-      const saved: SurveyResponse = { id: randomUUID(), ...record };
+      const saved: SurveyResponse = { id: randomUUID(), ...record, deletedAt: null };
       await fs.mkdir(path.dirname(FILE), { recursive: true });
       await fs.appendFile(FILE, `${JSON.stringify(saved)}\n`, "utf8");
       return saved;
@@ -90,11 +99,26 @@ export function createFileStore(): ResponseStore {
       const digits = normaliseNric(nric);
       if (!digits) return null;
       const all = await readAll();
-      return all.find((row) => normaliseNric(row.answers.nric) === digits)?.id ?? null;
+      // A binned response does not hold its NRIC.
+      return (
+        all.find((row) => !row.deletedAt && normaliseNric(row.answers.nric) === digits)?.id ?? null
+      );
+    },
+
+    // The file store is append-only, so a state change means rewriting the
+    // whole file. Fine for a development store; Supabase does this in place.
+    async softDelete(id: string) {
+      await rewrite((row) =>
+        row.id === id ? { ...row, deletedAt: new Date().toISOString() } : row,
+      );
+    },
+
+    async restore(id: string) {
+      await rewrite((row) => (row.id === id ? { ...row, deletedAt: null } : row));
     },
 
     async all() {
-      const all = await readAll();
+      const all = (await readAll()).filter((row) => !row.deletedAt);
       all.sort((a, b) => a.receivedAt.localeCompare(b.receivedAt));
       return all;
     },

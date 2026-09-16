@@ -114,6 +114,47 @@ try {
   const stillOne = await store.list({ limit: 50, offset: 0, search: nric });
   check("only one row exists for that NRIC", mine(stillOne.rows).length, 1);
 
+  // ── The bin ───────────────────────────────────────────────────────────────
+  const binned = await seed("en", { agent_name: "Binned", anything_else: "Delete me." },
+    "2026-09-25T02:00:00.000Z");
+  check("a new response is not deleted", binned.deletedAt, null);
+
+  await store.softDelete(binned.id);
+
+  const afterDelete = await store.list({ limit: 50, offset: 0 });
+  check("a deleted response leaves the live list",
+    mine(afterDelete.rows).some((r) => r.id === binned.id), false);
+
+  const bin = await store.list({ limit: 50, offset: 0, deleted: true });
+  check("it appears in the bin", mine(bin.rows).some((r) => r.id === binned.id), true);
+  check("the bin records when it was deleted",
+    typeof mine(bin.rows).find((r) => r.id === binned.id).deletedAt, "string");
+
+  check("it is excluded from exports and dashboard figures",
+    (await store.all()).some((r) => r.id === binned.id), false);
+  check("it can still be opened directly", (await store.get(binned.id))?.id, binned.id);
+
+  // A deleted response must release its NRIC, or an admin deleting someone's
+  // answers would lock that agent out of answering again.
+  const freed = String(Date.now() + 1).padStart(12, "8").slice(-12);
+  const held = await seed("en", { agent_name: "Holder", nric: freed }, "2026-09-26T02:00:00.000Z");
+  check("a live response holds its NRIC", await store.findByNric(freed), held.id);
+
+  await store.softDelete(held.id);
+  check("a binned response releases its NRIC", await store.findByNric(freed), null);
+
+  const again = await seed("en", { agent_name: "Second try", nric: freed }, "2026-09-27T02:00:00.000Z");
+  check("so that agent can answer again", typeof again.id, "string");
+
+  await store.restore(binned.id);
+  const afterRestore = await store.list({ limit: 50, offset: 0 });
+  check("restoring returns it to the live list",
+    mine(afterRestore.rows).some((r) => r.id === binned.id), true);
+  check("and out of the bin",
+    (await store.list({ limit: 50, offset: 0, deleted: true })).rows.some((r) => r.id === binned.id),
+    false);
+  check("and it counts again", (await store.all()).some((r) => r.id === binned.id), true);
+
   const badKey = createSupabaseStore(url, "definitely-not-the-key");
   try {
     await badKey.list({ limit: 1, offset: 0 });

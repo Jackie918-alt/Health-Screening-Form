@@ -4,6 +4,8 @@ import { requireAdmin } from "@/lib/admin-session";
 import { getStorageStatus } from "@/lib/responses";
 import { presentAnswers } from "@/lib/responses/present";
 import { AdminHeader } from "../AdminChrome";
+import { DeleteButton } from "../DeleteButton";
+import { RestoreButton } from "../RestoreButton";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +51,18 @@ export default async function ResponsePage({ params }: PageProps<"/admin/[id]">)
           Response
         </h1>
 
+        {response.deletedAt && (
+          <div className="mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+            <p className="text-sm text-amber-900">
+              <strong className="font-display font-bold">In the bin.</strong> Excluded from the
+              dashboard figures and the CSV export.
+            </p>
+            <div className="ml-auto">
+              <RestoreButton id={response.id} />
+            </div>
+          </div>
+        )}
+
         <dl className="mt-4 grid grid-cols-1 gap-3 rounded-2xl border border-line bg-white p-5 text-sm shadow-card sm:grid-cols-2">
           <Meta label="Received">{formatDate(response.receivedAt)}</Meta>
           <Meta label="Submitted (device clock)">{formatDate(response.submittedAt)}</Meta>
@@ -87,6 +101,16 @@ export default async function ResponsePage({ params }: PageProps<"/admin/[id]">)
             ))
           )}
         </div>
+
+        {!response.deletedAt && (
+          <div className="mt-8 border-t border-line pt-6">
+            <DeleteButton id={response.id} />
+            <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+              Deleting moves this to the bin rather than destroying it. It stops counting towards
+              the dashboard and the export, and frees this agent&rsquo;s NRIC to answer again.
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );

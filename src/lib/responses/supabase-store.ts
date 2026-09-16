@@ -30,6 +30,7 @@ type Row = {
   submitted_at: string;
   received_at: string;
   answers: Answers;
+  deleted_at: string | null;
 };
 
 function toResponse(row: Row): SurveyResponse {
@@ -41,6 +42,7 @@ function toResponse(row: Row): SurveyResponse {
     submittedAt: row.submitted_at,
     receivedAt: row.received_at,
     answers: row.answers ?? {},
+    deletedAt: row.deleted_at ?? null,
   };
 }
 
@@ -133,14 +135,23 @@ export function createSupabaseStore(url: string, serviceKey: string): ResponseSt
       // Stored NRICs are already digits-only, so this is a plain equality
       // match on the JSON key — which PostgREST supports natively and an
       // expression index can serve.
-      const params = new URLSearchParams({ select: "id", "answers->>nric": `eq.${digits}`, limit: "1" });
+      // A response in the bin does not hold its NRIC: if an admin deleted it,
+      // that agent should be able to answer again.
+      const params = new URLSearchParams({
+        select: "id",
+        "answers->>nric": `eq.${digits}`,
+        deleted_at: "is.null",
+        limit: "1",
+      });
       const res = await call(`?${params}`);
       const rows = (await res.json()) as { id: string }[];
       return rows[0]?.id ?? null;
     },
 
-    async list({ limit, offset, search, language }: ListOptions) {
+    async list({ limit, offset, search, language, deleted }: ListOptions) {
       const base = new URLSearchParams({ select: "*", order: "received_at.desc" });
+      // Deleted rows are a separate view, never mixed into the live list.
+      base.set("deleted_at", deleted ? "not.is.null" : "is.null");
       if (language) base.set("language", `eq.${language}`);
 
       // Text search runs here rather than in the database. PostgREST cannot
@@ -180,8 +191,27 @@ export function createSupabaseStore(url: string, serviceKey: string): ResponseSt
       return rows.length > 0 ? toResponse(rows[0]) : null;
     },
 
+    async softDelete(id: string) {
+      await call(`?id=eq.${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+      });
+    },
+
+    async restore(id: string) {
+      await call(`?id=eq.${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ deleted_at: null }),
+      });
+    },
+
     async all() {
-      const params = new URLSearchParams({ select: "*", order: "received_at.asc" });
+      // Exports and dashboard figures count live responses only.
+      const params = new URLSearchParams({
+        select: "*",
+        order: "received_at.asc",
+        deleted_at: "is.null",
+      });
       const res = await call(`?${params}`);
       const rows = (await res.json()) as Row[];
       return rows.map(toResponse);
